@@ -288,7 +288,7 @@ def learn(env,
                     learning_rate: optimizer_spec.lr_schedule.value(t)
                     })
 
-            if t // update_target_fn > num_param_updates:
+            if t // target_update_freq > num_param_updates:
                 session.run(update_target_fn)
                 num_param_updates += 1
 
