@@ -17,6 +17,12 @@ def build_mlp(input_placeholder,
         out = tf.layers.dense(out, output_size, activation=output_activation)
     return out
 
+def normalize(data, mean, std):
+    return (data-mean)/ (std+1e-10)
+
+def denormalize(data, mean, std):
+    return data*(std+1e-10) + mean
+
 class NNDynamicsModel():
     def __init__(self, 
                  env, 
@@ -32,14 +38,60 @@ class NNDynamicsModel():
                  ):
         """ YOUR CODE HERE """
         """ Note: Be careful about normalization """
+        discrete = isinstance(env.action_space, gym.spaces.Discrete)
+        ob_dim = env.observation_space.shape[0]
+        ac_dim = env.action_space.n if discrete else env.action_space.shape[0]
+
+        self.input_state = tf.placeholder(shape=[None, ob_dim], name="ob", dtype=tf.float32)
+        self.action = tf.placeholder(shape=[None, ac_dim], name="act", dtype=tf.float32)
+        self.delta = tf.placeholder(shape=[None, ob_dim], name="delta", dtype=tf.float32)
+
+        self.model = build_mlp(tf.concat([self.input_state, self.action], axis=1), ob_dim, "NNDynamicsModel", n_layers, size, activation, output_activation)
+
+        self.normalization = normalization
+
+        self.loss = tf.losses.mean_squared_error(labels=self.delta, predictions=self.model)
+        self.update = tf.train.AdamOptimizer().minimize(self.loss)
+        self.batch_size = batch_size
+        self.iterations = iterations
+        self.learning_rate = learning_rate
+        self.sess = sess
 
     def fit(self, data):
         """
         Write a function to take in a dataset of (unnormalized)states, (unnormalized)actions, (unnormalized)next_states and fit the dynamics model going from normalized states, normalized actions to normalized state differences (s_t+1 - s_t)
         """
-
         """YOUR CODE HERE """
+        mean_obs, std_obs, mean_delta, std_delta, mean_action, std_action = self.normalization
+        normalized_obs = normalize(data["observations"], mean_obs, std_obs)
+        normalized_acs = normalize(data["actions"], mean_action, std_action)
+        normalized_deltas = normalize(data["next_observations"] - data["observations"], mean_delta, std_delta)
+
+        dataset = tf.data.Dataset.from_tensor_slices((normalized_obs, normalized_acs, normalized_deltas)).batch(self.batch_size)
+        dataset_iterator = dataset.make_one_shot_iterator()
+
+        for epoch in range(self.iterations):
+            if epoch % 20 == 0: print("Epoch {}/{}: Loss {}".format(epoch, self.iterations, loss_val))
+            
+            for i in range(len(normalized_deltas)//self.batch_size):
+                batch_obs, batch_acs, batch_deltas = sess.run(dataset_iterator.get_next())
+                _, loss_val = self.sess.run([self.update, self.loss], feed_dict={
+                                                            self.input_state: batch_obs,
+                                                            self.action: batch_acs,
+                                                            self.delta: batch_deltas})
+
+
 
     def predict(self, states, actions):
         """ Write a function to take in a batch of (unnormalized) states and (unnormalized) actions and return the (unnormalized) next states as predicted by using the model """
         """ YOUR CODE HERE """
+        mean_obs, std_obs, mean_delta, std_delta, mean_action, std_action = self.normalization
+        deltas = self.sess.run(self.model, feed_dict={
+                                               self.input_state: normalize(states, mean_obs, std_obs),
+                                               self.actions: normalize(actions, mean_action, std_action)})
+        
+        next_states = states + denormalize(deltas, mean_delta, std_delta)
+
+        return next_states
+
+

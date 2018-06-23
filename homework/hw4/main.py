@@ -22,14 +22,43 @@ def sample(env,
         and returns rollouts by running on the env. 
         Each path can have elements for observations, next_observations, rewards, returns, actions, etc.
     """
-    paths = []
+    obs, acs, rewards, next_obs, ep_lengths, returns = [], [], [], [], [], []
     """ YOUR CODE HERE """
+    for i in range(num_paths):
+        ob = env.reset()
+        steps = 0
+        while True:
+            obs.append(ob)
+            ac = controller.get_action(ob)
+            acs.append(ac)
+            ob, rew, done, _ = env.step(ac)
+            rewards.append(rew)
+            next_obs.append(ob)
+
+            steps += 1
+            if done or steps > horizon:
+                break
+        ep_lengths.append(steps)
+        returns.append(sum(rewards[-steps:]))
+
+    paths = {"observations" : np.array(obs), 
+            "rewards" : np.array(rewards), 
+            "actions" : np.array(acs),
+            "next_observations" : np.array(next_obs),
+            "returns": np.array(returns),
+            "ep_lengths": np.array(ep_lengths)}
 
     return paths
 
 # Utility to compute cost a path for a given cost function
 def path_cost(cost_fn, path):
-    return trajectory_cost_fn(cost_fn, path['observations'], path['actions'], path['next_observations'])
+
+    costs = []
+    cum_len = 0
+    for i in path[ep_lengths]:
+        costs.append(trajectory_cost_fn(cost_fn, path['observations'][cum_len: cum_len+i], path['actions'][cum_len: cum_len+i], path['next_observations'][cum_len: cum_len+i]))
+        cum_len = cum_len + i
+    return costs
 
 def compute_normalization(data):
     """
@@ -38,6 +67,14 @@ def compute_normalization(data):
     """
 
     """ YOUR CODE HERE """
+    mean_obs = np.mean(data["observations"], axis = 0)
+    std_obs = np.std(data["observations"], axis = 0)
+    deltas = data["next_observations"] - data["observations"]
+    mean_deltas = np.mean(deltas, axis = 0)
+    std_deltas = np.std(deltas, axis = 0)
+    mean_action = np.mean(data["actions"], axis = 0)
+    std_action = np.std(data["actions"], axis = 0)
+
     return mean_obs, std_obs, mean_deltas, std_deltas, mean_action, std_action
 
 
@@ -112,6 +149,7 @@ def train(env,
     random_controller = RandomController(env)
 
     """ YOUR CODE HERE """
+    data = sample(env, random_controller, num_paths_random, env_horizon)
 
 
     #========================================================
@@ -122,7 +160,7 @@ def train(env,
     # for normalizing inputs and denormalizing outputs
     # from the dynamics network. 
     # 
-    normalization = """ YOUR CODE HERE """
+    normalization = compute_normalization(data)
 
 
     #========================================================
@@ -164,7 +202,16 @@ def train(env,
     for itr in range(onpol_iters):
         """ YOUR CODE HERE """
 
+        shuffle_indexes = np.random.permutation(data["observations"].shape[0])
+        for key in ['observations', 'actions', 'next_observations', 'rewards']:
+            data[key] = data[key][shuffle_indexes]
 
+        dyn_model.fit(data)
+
+        data_new = sample(env, MPCcontroller, num_paths_onpol, mpc_horizon)
+
+        costs = path_cost(cost_fn, data_new)
+        returns = data_new["returns"]
 
         # LOGGING
         # Statistics for performance of MPC policy using
@@ -182,6 +229,9 @@ def train(env,
         logz.log_tabular('MaximumReturn', np.max(returns))
 
         logz.dump_tabular()
+
+        for key in data.keys():
+            data[key] = np.concatenate([data[key], data_new[key]])
 
 def main():
 
