@@ -50,7 +50,7 @@ class NNDynamicsModel():
         self.normalization = normalization
 
         self.loss = tf.losses.mean_squared_error(labels=self.delta, predictions=self.model)
-        self.update = tf.train.AdamOptimizer().minimize(self.loss)
+        self.update = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
         self.batch_size = batch_size
         self.iterations = iterations
         self.learning_rate = learning_rate
