@@ -38,9 +38,8 @@ class NNDynamicsModel():
                  ):
         """ YOUR CODE HERE """
         """ Note: Be careful about normalization """
-        discrete = isinstance(env.action_space, gym.spaces.Discrete)
         ob_dim = env.observation_space.shape[0]
-        ac_dim = env.action_space.n if discrete else env.action_space.shape[0]
+        ac_dim = env.action_space.shape[0]
 
         self.input_state = tf.placeholder(shape=[None, ob_dim], name="ob", dtype=tf.float32)
         self.action = tf.placeholder(shape=[None, ac_dim], name="act", dtype=tf.float32)
@@ -67,14 +66,14 @@ class NNDynamicsModel():
         normalized_acs = normalize(data["actions"], mean_action, std_action)
         normalized_deltas = normalize(data["next_observations"] - data["observations"], mean_delta, std_delta)
 
-        dataset = tf.data.Dataset.from_tensor_slices((normalized_obs, normalized_acs, normalized_deltas)).batch(self.batch_size)
+        dataset = tf.data.Dataset.from_tensor_slices((normalized_obs, normalized_acs, normalized_deltas)).repeat().batch(self.batch_size)
         dataset_iterator = dataset.make_one_shot_iterator()
-
+        next_element = dataset_iterator.get_next()
+        loss_val = None
         for epoch in range(self.iterations):
             if epoch % 20 == 0: print("Epoch {}/{}: Loss {}".format(epoch, self.iterations, loss_val))
-            
             for i in range(len(normalized_deltas)//self.batch_size):
-                batch_obs, batch_acs, batch_deltas = sess.run(dataset_iterator.get_next())
+                batch_obs, batch_acs, batch_deltas = self.sess.run(dataset_iterator.get_next())
                 _, loss_val = self.sess.run([self.update, self.loss], feed_dict={
                                                             self.input_state: batch_obs,
                                                             self.action: batch_acs,
