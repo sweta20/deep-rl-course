@@ -55,7 +55,7 @@ def path_cost(cost_fn, path):
 
     costs = []
     cum_len = 0
-    for i in path[ep_lengths]:
+    for i in path["ep_lengths"]:
         costs.append(trajectory_cost_fn(cost_fn, path['observations'][cum_len: cum_len+i], path['actions'][cum_len: cum_len+i], path['next_observations'][cum_len: cum_len+i]))
         cum_len = cum_len + i
     return costs
