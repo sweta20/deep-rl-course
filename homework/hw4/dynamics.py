@@ -71,7 +71,7 @@ class NNDynamicsModel():
         next_element = dataset_iterator.get_next()
         loss_val = None
         for epoch in range(self.iterations):
-            if epoch % 20 == 0: print("Epoch {}/{}: Loss {}".format(epoch, self.iterations, loss_val))
+            if epoch % 10 == 0: print("Epoch {}/{}: Loss {}".format(epoch, self.iterations, loss_val))
             for i in range(len(normalized_deltas)//self.batch_size):
                 batch_obs, batch_acs, batch_deltas = self.sess.run(dataset_iterator.get_next())
                 _, loss_val = self.sess.run([self.update, self.loss], feed_dict={
@@ -87,7 +87,7 @@ class NNDynamicsModel():
         mean_obs, std_obs, mean_delta, std_delta, mean_action, std_action = self.normalization
         deltas = self.sess.run(self.model, feed_dict={
                                                self.input_state: normalize(states, mean_obs, std_obs),
-                                               self.actions: normalize(actions, mean_action, std_action)})
+                                               self.action: normalize(actions, mean_action, std_action)})
         
         next_states = states + denormalize(deltas, mean_delta, std_delta)
 

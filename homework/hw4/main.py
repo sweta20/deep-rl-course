@@ -208,7 +208,7 @@ def train(env,
 
         dyn_model.fit(data)
 
-        data_new = sample(env, MPCcontroller, num_paths_onpol, mpc_horizon)
+        data_new = sample(env, mpc_controller, num_paths_onpol, mpc_horizon)
 
         costs = path_cost(cost_fn, data_new)
         returns = data_new["returns"]

@@ -52,7 +52,7 @@ class MPCcontroller(Controller):
 			n_states.append(self.dyn_model.predict(states[-1], sampled_actions[i,]))
 			if i < self.horizon: states.append(n_states[-1])
 
-		costs = trajectory_cost_fn(self.cost_fn, states.T, sampled_actions.T, n_states.T)
+		costs = trajectory_cost_fn(self.cost_fn, states, sampled_actions, n_states)
 
 		return sampled_actions[0][np.argmin(costs)]
 
